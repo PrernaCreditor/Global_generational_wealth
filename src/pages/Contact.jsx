@@ -1,9 +1,87 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import ScrollToTop from '../components/ScrollToTop';
 
 export default function Contact() {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    subject: '',
+    message: ''
+  });
+  const [status, setStatus] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Get your access key from https://web3forms.com
+  // Add it to your .env file as: VITE_WEB3FORMS_ACCESS_KEY=your_key_here
+  const accessKey = import.meta.env.VITE_WEB3FORMS_ACCESS_KEY || '';
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setStatus('');
+
+    // Validate access key
+    if (!accessKey) {
+      setStatus('Error: Web3Forms access key is not configured. Please add VITE_WEB3FORMS_ACCESS_KEY to your .env file.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Validate form
+    if (!formData.name || !formData.email || !formData.message) {
+      setStatus('Please fill in all required fields.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      const response = await fetch('https://api.web3forms.com/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          access_key: accessKey,
+          name: formData.name,
+          email: formData.email,
+          subject: formData.subject || 'Contact Form Submission',
+          message: formData.message,
+          from_name: formData.name
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setStatus('Message sent successfully! We will get back to you soon.');
+        setFormData({
+          name: '',
+          email: '',
+          subject: '',
+          message: ''
+        });
+      } else {
+        setStatus('Failed to send message. Please try again later.');
+      }
+    } catch (error) {
+      setStatus('An error occurred. Please try again later.');
+      console.error('Form submission error:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="app">
       <Navbar />
@@ -79,22 +157,40 @@ export default function Contact() {
               <div className="bg-gray-800/50 p-8 rounded-xl border border-[var(--gold)]/20 backdrop-blur-sm">
                 <h2 className="text-2xl font-bold mb-6 text-[var(--gold)]">Send us a Message</h2>
                 
-                <form className="space-y-6">
+                {status && (
+                  <div className={`mb-6 p-4 rounded-lg ${
+                    status.includes('successfully') 
+                      ? 'bg-green-500/20 border border-green-500/50 text-green-300' 
+                      : 'bg-red-500/20 border border-red-500/50 text-red-300'
+                  }`}>
+                    {status}
+                  </div>
+                )}
+                
+                <form onSubmit={handleSubmit} className="space-y-6">
                   <div>
-                    <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-2">Name</label>
+                    <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-2">Name *</label>
                     <input
                       type="text"
                       id="name"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleChange}
+                      required
                       className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[var(--gold)] focus:border-transparent"
                       placeholder="Your Name"
                     />
                   </div>
                   
                   <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">Email</label>
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">Email *</label>
                     <input
                       type="email"
                       id="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleChange}
+                      required
                       className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[var(--gold)] focus:border-transparent"
                       placeholder="your.email@example.com"
                     />
@@ -104,6 +200,9 @@ export default function Contact() {
                     <label htmlFor="subject" className="block text-sm font-medium text-gray-300 mb-2">Subject</label>
                     <select
                       id="subject"
+                      name="subject"
+                      value={formData.subject}
+                      onChange={handleChange}
                       className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[var(--gold)] focus:border-transparent appearance-none"
                     >
                       <option value="">Select a Service</option>
@@ -114,9 +213,13 @@ export default function Contact() {
                   </div>
                   
                   <div>
-                    <label htmlFor="message" className="block text-sm font-medium text-gray-300 mb-2">Message</label>
+                    <label htmlFor="message" className="block text-sm font-medium text-gray-300 mb-2">Message *</label>
                     <textarea
                       id="message"
+                      name="message"
+                      value={formData.message}
+                      onChange={handleChange}
+                      required
                       rows="5"
                       className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[var(--gold)] focus:border-transparent"
                       placeholder="Your message here..."
@@ -125,9 +228,12 @@ export default function Contact() {
                   
                   <button
                     type="submit"
-                    className="w-full px-6 py-3 bg-gradient-to-r from-[var(--gold-dark)] via-[var(--gold)] to-[var(--gold-dark)] text-black font-bold hover:from-[var(--gold)] hover:via-[var(--gold-light)] hover:to-[var(--gold)] transition-all duration-500 uppercase tracking-wider"
+                    disabled={isSubmitting}
+                    className={`w-full px-6 py-3 bg-gradient-to-r from-[var(--gold-dark)] via-[var(--gold)] to-[var(--gold-dark)] text-black font-bold hover:from-[var(--gold)] hover:via-[var(--gold-light)] hover:to-[var(--gold)] transition-all duration-500 uppercase tracking-wider ${
+                      isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
                   >
-                    Send Message
+                    {isSubmitting ? 'Sending...' : 'Send Message'}
                   </button>
                 </form>
               </div>
